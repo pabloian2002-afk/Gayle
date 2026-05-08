@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>For Gayle 💚</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700&family=Playfair+Display:wght@500&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"></script>
+
+<style>
+body{
+margin:0;
+font-family:'Inter',sans-serif;
+background: radial-gradient(circle at 20% 20%, #0f2a1f, #050505 60%);
+color:#d1ffd9;
+overflow-x:hidden;
+}
+
+h3{
+font-family:'Playfair Display',serif;
+color:#00ff88;
+}
+
+/* login */
+#loginScreen{
+position:fixed;width:100%;height:100%;
+display:flex;justify-content:center;align-items:center;
+background:#050505;z-index:9999;
+}
+.loginCard{
+background:rgba(0,255,136,0.08);
+padding:30px;border-radius:18px;
+text-align:center;
+border:1px solid rgba(0,255,136,0.2);
+}
+
+input,textarea{
+padding:10px;border-radius:10px;border:none;
+margin-top:5px;width:90%;
+background:#111;color:#d1ffd9;
+}
+
+button{
+padding:10px;border-radius:12px;
+border:none;background:#00ff88;color:black;
+cursor:pointer;
+}
+
+button:active{transform:scale(0.95);}
+
+/* layout */
+.app{
+display:grid;
+grid-template-columns:repeat(2,1fr);
+gap:15px;padding:15px;
+}
+.card{
+background:rgba(0,255,136,0.05);
+border:1px solid rgba(0,255,136,0.15);
+border-radius:16px;padding:15px;
+}
+
+/* chat */
+#chatBox{
+height:250px;overflow-y:auto;
+display:flex;flex-direction:column;gap:8px;
+}
+.msg{
+display:flex;
+align-items:flex-end;
+gap:6px;
+}
+.msg.me{justify-content:flex-end;}
+.bubble{
+padding:10px;border-radius:15px;
+max-width:70%;
+}
+.me .bubble{background:#00ff88;color:black;}
+.them .bubble{background:rgba(0,255,136,0.2);}
+
+/* gallery */
+#galleryModal,#previewModal{
+position:fixed;top:0;left:0;width:100%;height:100%;
+background:#000;display:none;z-index:9999;
+}
+#galleryGrid{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(100px,1fr));
+gap:10px;padding:60px 20px;
+}
+#previewModal{
+display:flex;flex-direction:column;
+justify-content:center;align-items:center;
+}
+#previewImg{
+max-width:90%;max-height:80%;
+touch-action:none;
+}
+
+/* hearts */
+.heart{
+position:fixed;
+bottom:-10px;
+color:#ff4d4d;
+animation:float 5s linear forwards;
+}
+@keyframes float{
+to{transform:translateY(-110vh);opacity:0;}
+}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+<div class="loginCard">
+<h2>ACCESS 💚</h2>
+<input id="passwordInput">
+<button onclick="checkPassword()">Unlock</button>
+<p id="errorMsg"></p>
+</div>
+</div>
+
+<!-- POPUP -->
+<div id="popup" style="position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#00ff88;color:black;padding:10px;border-radius:10px;display:none;"></div>
+
+<!-- APP -->
+<div class="app">
+
+<div class="card">
+<h3>💚 Reasons</h3>
+<button onclick="generateReason()">Reveal</button>
+<p id="reasonBox"></p>
+</div>
+
+<div class="card">
+<h3>💬 Messages</h3>
+<button onclick="showMessage('sad')">Sad</button>
+<button onclick="showMessage('miss')">Miss</button>
+<button onclick="showMessage('happy')">Happy</button>
+<p id="messageBox"></p>
+</div>
+
+<div class="card">
+<h3>📸 Moments</h3>
+<input type="file" id="uploadInput" hidden onchange="saveImage(event)">
+<button onclick="uploadInput.click()">Upload</button>
+<button onclick="openGallery()">View Gallery</button>
+</div>
+
+<div class="card">
+<h3>💬 Leave Me Something</h3>
+<textarea id="msgInput"></textarea>
+<button onclick="saveMessage()">Send</button>
+<div id="msgList"></div>
+</div>
+
+<div class="card">
+<h3>💕 Requests</h3>
+<button onclick="quickRequest('Cuddles 🫂')">Cuddles</button>
+<button onclick="quickRequest('Ice Cream 🍦')">Ice Cream</button>
+<button onclick="quickRequest('Dinner 🍽️')">Dinner</button>
+<textarea id="requestInput"></textarea>
+<button onclick="saveRequest()">Send</button>
+<div id="requestList"></div>
+</div>
+
+<div class="card">
+<h3>DM 💬</h3>
+
+<div id="status">🟢 Online</div>
+<div id="typingIndicator"></div>
+
+<div id="chatBox"></div>
+<input id="chatInput">
+<button onclick="sendMessage()">Send</button>
+<button onclick="startRecording()">🎤</button>
+<input type="file" onchange="sendImage(event)">
+
+<div id="seenStatus"></div>
+</div>
+
+</div>
+
+<!-- GALLERY -->
+<div id="galleryModal">
+<button onclick="closeGallery()">Close</button>
+<div id="galleryGrid"></div>
+</div>
+
+<!-- PREVIEW -->
+<div id="previewModal">
+<button onclick="closePreview()">← Back</button>
+<img id="previewImg">
+<div>
+<button onclick="prevImage()">⬅</button>
+<button onclick="toggleLike()">❤️</button>
+<button onclick="nextImage()">➡</button>
+</div>
+</div>
+
+<audio id="notifSound" src="https://www.soundjay.com/buttons/sounds/button-3.mp3"></audio>
+
+<script>
+
+// -------- LOGIN --------
+function checkPassword(){
+if(passwordInput.value==="Gayle"){
+loginScreen.style.display="none";
+requestNotificationPermission();
+setOnline();
+}else errorMsg.innerText="Access denied";
+}
+
+// -------- POPUP --------
+function showPopup(msg){
+popup.innerText=msg;
+popup.style.display="block";
+setTimeout(()=>popup.style.display="none",2000);
+}
+
+// -------- HEARTS --------
+setInterval(()=>{
+let h=document.createElement("div");
+h.className="heart";
+h.innerText="❤️";
+h.style.left=Math.random()*100+"vw";
+document.body.appendChild(h);
+setTimeout(()=>h.remove(),5000);
+},1000);
+
+// -------- LOVE FEATURES --------
+const reasons=["Your smile","Your laugh","Everything about you"];
+function generateReason(){
+reasonBox.innerText=reasons[Math.random()*reasons.length|0];
+showPopup("Because of you 💚");
+}
+
+const msgs={sad:"I’m here 💚",miss:"I miss you 💚",happy:"You make me happy 💚"};
+function showMessage(t){messageBox.innerText=msgs[t];}
+
+// -------- STORAGE --------
+function saveMessage(){
+let list=JSON.parse(localStorage.getItem("msgs")||"[]");
+list.push(msgInput.value);
+localStorage.setItem("msgs",JSON.stringify(list));
+msgInput.value="";
+displayMessages();
+showPopup("Saved 💬");
+}
+function displayMessages(){
+msgList.innerHTML="";
+(JSON.parse(localStorage.getItem("msgs")||"[]")).forEach(t=>{
+let d=document.createElement("div");d.innerText=t;msgList.appendChild(d);
+});
+}
+displayMessages();
+
+function quickRequest(t){requestInput.value=t;}
+function saveRequest(){
+let list=JSON.parse(localStorage.getItem("req")||"[]");
+list.push(requestInput.value);
+localStorage.setItem("req",JSON.stringify(list));
+requestInput.value="";
+displayRequests();
+showPopup("Request sent 💕");
+}
+function displayRequests(){
+requestList.innerHTML="";
+(JSON.parse(localStorage.getItem("req")||"[]")).forEach(t=>{
+let d=document.createElement("div");d.innerText="💚 "+t;requestList.appendChild(d);
+});
+}
+displayRequests();
+
+// -------- GALLERY --------
+function saveImage(e){
+let r=new FileReader();
+r.onload=ev=>{
+let imgs=JSON.parse(localStorage.getItem("imgs")||"[]");
+imgs.push(ev.target.result);
+localStorage.setItem("imgs",JSON.stringify(imgs));
+showPopup("Photo saved 📸");
+};
+r.readAsDataURL(e.target.files[0]);
+}
+
+function openGallery(){
+galleryModal.style.display="block";
+displayImages();
+}
+function closeGallery(){galleryModal.style.display="none";}
+
+function displayImages(){
+galleryGrid.innerHTML="";
+let imgs=JSON.parse(localStorage.getItem("imgs")||"[]");
+imgs.forEach((src,i)=>{
+let img=document.createElement("img");
+img.src=src;
+img.style.width="100%";
+img.onclick=()=>openPreview(i);
+galleryGrid.appendChild(img);
+});
+}
+
+// -------- PREVIEW --------
+let currentIndex=0,likes=JSON.parse(localStorage.getItem("likes")||"[]");
+
+function openPreview(i){
+currentIndex=i;
+previewModal.style.display="flex";
+showImage();
+}
+function closePreview(){previewModal.style.display="none";}
+function showImage(){
+let imgs=JSON.parse(localStorage.getItem("imgs")||"[]");
+previewImg.src=imgs[currentIndex];
+}
+function nextImage(){currentIndex++;showImage();}
+function prevImage(){currentIndex--;showImage();}
+
+// -------- FIREBASE --------
+const firebaseConfig={};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+const myName="me";
+
+// -------- CHAT --------
+function sendMessage(){
+db.ref("messages").push({
+sender:myName,
+text:chatInput.value,
+timestamp:Date.now(),
+seen:false
+});
+chatInput.value="";
+}
+
+function formatTime(ts){
+return new Date(ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+}
+
+db.ref("messages").on("child_added",snap=>{
+let m=snap.val();
+
+let div=document.createElement("div");
+let isMe=m.sender===myName;
+div.className="msg "+(isMe?"me":"them");
+
+let bubble=document.createElement("div");
+bubble.className="bubble";
+bubble.innerHTML=`${m.text}<br><small>${formatTime(m.timestamp)} ${isMe?(m.seen?"✓✓":"✓"):""}</small>`;
+
+div.appendChild(bubble);
+
+chatBox.appendChild(div);
+chatBox.scrollTop=99999;
+});
+
+// -------- ONLINE --------
+function setOnline(){
+db.ref("status/"+myName).set({online:true});
+}
+
+// -------- TYPING --------
+chatInput.addEventListener("input",()=>{
+db.ref("typing/"+myName).set(true);
+setTimeout(()=>db.ref("typing/"+myName).set(false),1000);
+});
+
+</script>
+
+</body>
+</html>
